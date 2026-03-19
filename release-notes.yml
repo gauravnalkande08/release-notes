@@ -1,0 +1,52 @@
+- name: Generate ADO-like HTML Release Notes
+  run: |
+    if [ -f prs.json ]; then
+
+      echo "<html><head><title>Release Notes</title>
+      <style>
+      body { font-family: Arial; margin: 20px; }
+      h1 { color: #2c3e50; }
+      h2 { color: #34495e; }
+      li { margin-bottom: 6px; }
+      </style>
+      </head><body>" > release-notes.html
+
+      echo "<h1>🚀 Release Notes</h1>" >> release-notes.html
+      echo "<p><b>Generated on:</b> $(date)</p>" >> release-notes.html
+
+      # -------------------------------
+      # PR SECTION
+      # -------------------------------
+      echo "<h2>Associated Pull Requests</h2><ul>" >> release-notes.html
+
+      jq -r '.[] | select(.merged_at != null) | "<li><a href=\"\(.html_url)\">PR #\(.number)</a> - \(.title) by \(.user.login)</li>"' prs.json >> release-notes.html
+
+      echo "</ul>" >> release-notes.html
+
+      # -------------------------------
+      # COMMITS SECTION
+      # -------------------------------
+      echo "<h2>Commits</h2><ul>" >> release-notes.html
+
+      curl -s -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+      "https://github.axa.com/api/v3/repos/axa-go-ssdlc/ref-app-java-boardgame/commits?per_page=20" \
+      -o commits.json
+
+      jq -r '.[] | "<li><b>" + (.commit.message | split("\n")[0]) + "</b> by " + .commit.author.name + "</li>"' commits.json >> release-notes.html
+
+      echo "</ul>" >> release-notes.html
+
+      # -------------------------------
+      # BUILD INFO SECTION
+      # -------------------------------
+      echo "<h2>Build Info</h2>" >> release-notes.html
+      echo "<ul><li>Repository: ref-app-java-boardgame</li>" >> release-notes.html
+      echo "<li>Branch: main</li></ul>" >> release-notes.html
+
+      echo "</body></html>" >> release-notes.html
+
+      cat release-notes.html
+
+    else
+      echo "prs.json not found. Skipping release notes generation."
+    fi
