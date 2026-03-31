@@ -1,0 +1,73 @@
+- name: Generate Clean Markdown Release Notes
+  run: |
+    set -e
+
+    if [ -f prs.json ]; then
+
+      FILE="release-notes.md"
+
+      echo "# 📘 Release Notes" > $FILE
+      echo "" >> $FILE
+
+      echo "**Release Date:** $(date +'%Y-%m-%d %H:%M:%S')" >> $FILE
+      echo "**Repository:** ref-app-java-boardgame" >> $FILE
+      echo "**Branch:** main" >> $FILE
+      echo "**Run ID:** $GITHUB_RUN_ID" >> $FILE
+      echo "" >> $FILE
+
+      echo "## 🚀 Associated Pull Requests" >> $FILE
+      echo "" >> $FILE
+
+      jq -r '.[] | select(.merged_at != null) | "- **PR #\(.number)**: [\(.title)](\(.html_url)) _(by \(.user.login))_ "' prs.json >> $FILE
+
+      echo "" >> $FILE
+
+      echo "## 🧾 Commits" >> $FILE
+      echo "" >> $FILE
+
+      curl -s -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+        "https://github.axa.com/api/v3/repos/axa-go-ssdcl/ref-app-java-boardgame/commits?per_page=20" \
+        -o commits.json
+
+      jq -r '.[] | "- **\(.commit.message | split("\n")[0])** _(by \(.commit.author.name))_ "' commits.json >> $FILE
+
+      echo "" >> $FILE
+
+      echo "## 🛠 Build Info" >> $FILE
+      echo "" >> $FILE
+      echo "- **Workflow:** Release Notes Testing" >> $FILE
+      echo "- **Run URL:** https://github.axa.com/axa-go-ssdcl/petclinic_workflow/actions/runs/$GITHUB_RUN_ID" >> $FILE
+
+      echo "" >> $FILE
+
+      echo "✅ Release notes generated successfully"
+
+    else
+      echo "prs.json not found. Skipping release notes generation."
+      exit 1
+    fi
+
+- name: Publish Release Notes to Wiki
+  run: |
+    set -e
+
+    # Clone wiki
+    git clone https://x-access-token:${{ secrets.GH_PAT }}@github.axa.com/axa-go-ssdcl/ref-app-java-boardgame.wiki.git
+
+    cd ref-app-java-boardgame.wiki
+
+    # Set git identity (MANDATORY)
+    git config user.name "github-actions"
+    git config user.email "github-actions@company.com"
+
+    # Create filename
+    FILE_NAME="Release-Notes-$(date +'%Y-%m-%d').md"
+
+    # Copy generated file
+    cp ../release-notes.md "$FILE_NAME"
+
+    # Commit & push
+    git add "$FILE_NAME"
+    git commit -m "Add release notes $(date +'%Y-%m-%d')" || echo "No changes to commit"
+    git push
+
