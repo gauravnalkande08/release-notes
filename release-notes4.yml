@@ -1,0 +1,52 @@
+- name: Generate ADO-like HTML Release Notes
+  run: |
+    if [ -f prs.json ]; then
+
+      # Create HTML file
+      echo "<html>" > release-notes.html
+      echo "<head>" >> release-notes.html
+      echo "<title>Release Notes</title>" >> release-notes.html
+      echo "<style>" >> release-notes.html
+      echo "body { font-family: Arial; margin: 20px; }" >> release-notes.html
+      echo "h1 { color: #2c3e50; }" >> release-notes.html
+      echo "h2 { color: #34495e; }" >> release-notes.html
+      echo "li { margin-bottom: 6px; }" >> release-notes.html
+      echo "</style>" >> release-notes.html
+      echo "</head>" >> release-notes.html
+      echo "<body>" >> release-notes.html
+
+      # Header
+      echo "<h1>Release Notes</h1>" >> release-notes.html
+      echo "<p><b>Generated on:</b> $(date)</p>" >> release-notes.html
+
+      # PR Section
+      echo "<h2>Associated Pull Requests</h2><ul>" >> release-notes.html
+      jq -r '.[] | select(.merged_at != null) | "<li><a href=\"\(.html_url)\">PR #\(.number)</a> - \(.title) by \(.user.login)</li>"' prs.json >> release-notes.html
+      echo "</ul>" >> release-notes.html
+
+      # Commits Section
+      echo "<h2>Commits</h2><ul>" >> release-notes.html
+      curl -s -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+        "https://github.axa.com/api/v3/repos/axa-go-ssdlc/ref-app-java-boardgame/commits?per_page=20" \
+        -o commits.json
+
+      jq -r '.[] | "<li><b>" + (.commit.message | split("\n")[0]) + "</b> by " + .commit.author.name + "</li>"' commits.json >> release-notes.html
+      echo "</ul>" >> release-notes.html
+
+      # Build Info Section
+      echo "<h2>Build Info</h2>" >> release-notes.html
+      echo "<ul>" >> release-notes.html
+      echo "<li>Repository: ref-app-java-boardgame</li>" >> release-notes.html
+      echo "<li>Branch: main</li>" >> release-notes.html
+      echo "<li>Run ID: $GITHUB_RUN_ID</li>" >> release-notes.html
+      echo "</ul>" >> release-notes.html
+
+      # Close HTML
+      echo "</body></html>" >> release-notes.html
+
+      # Output file
+      cat release-notes.html
+
+    else
+      echo "prs.json not found. Skipping release notes generation."
+    fi
