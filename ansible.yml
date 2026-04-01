@@ -1,0 +1,103 @@
+---
+############################################
+# STAGE 1: Download artifact from JFrog
+############################################
+- name: Download artifact from JFrog
+  hosts: localhost
+  vars:
+    artifact_dir: "/tmp/artifact_download"
+    jfrog_repo_path: "ago-fr_cfgp-catnat-gaia-nuget/*.zip"
+
+  tasks:
+
+    - name: Create artifact directory
+      file:
+        path: "{{ artifact_dir }}"
+        state: directory
+
+    - name: Configure JFrog CLI
+      shell: |
+        jfrog config add my-jfrog \
+          --artifactory-url=${JF_URL}/artifactory \
+          --user=${JF_USER} \
+          --password=${JF_PASSWORD} \
+          --interactive=false
+        jfrog config use my-jfrog
+      args:
+        chdir: "{{ artifact_dir }}"
+
+    - name: Download latest artifact
+      shell: |
+        jfrog rt dl "{{ jfrog_repo_path }}" "{{ artifact_dir }}/" \
+          --sort-by=created \
+          --sort-order=desc \
+          --limit=1 \
+          --server-id=my-jfrog
+      args:
+        chdir: "{{ artifact_dir }}"
+
+    - name: Find downloaded zip
+      shell: ls -t {{ artifact_dir }}/*.zip | head -1
+      register: artifact_file
+
+    - name: Set artifact path
+      set_fact:
+        downloaded_artifact: "{{ artifact_file.stdout }}"
+
+############################################
+# STAGE 2: Deploy on MPI servers
+############################################
+- name: Deploy to MPI servers
+  hosts: mdm_devservers
+  become: true
+
+  vars:
+    remote_zip: "/tmp/api.zip"
+    extract_path: "/tmp/api"
+    deploy_path: "/var/api"
+
+  tasks:
+
+    - name: Copy artifact to remote servers
+      copy:
+        src: "{{ hostvars['localhost']['downloaded_artifact'] }}"
+        dest: "{{ remote_zip }}"
+
+    - name: Remove old extracted folder
+      file:
+        path: "{{ extract_path }}"
+        state: absent
+
+    - name: Create extract directory
+      file:
+        path: "{{ extract_path }}"
+        state: directory
+
+    - name: Unzip artifact
+      unarchive:
+        src: "{{ remote_zip }}"
+        dest: "{{ extract_path }}"
+        remote_src: yes
+
+    - name: Backup existing deployment
+      shell: cp -r {{ deploy_path }} {{ deploy_path }}_backup_$(date +%s)
+      ignore_errors: yes
+
+    - name: Deploy using rsync
+      shell: |
+        rsync -av --exclude='*/configs/*' {{ extract_path }}/ {{ deploy_path }}/
+
+    - name: Restart node service
+      service:
+        name: nodeserver
+        state: restarted
+
+    - name: Restart httpd
+      service:
+        name: httpd
+        state: restarted
+
+    - name: Cleanup temp files
+      file:
+        path: "{{ extract_path }}"
+        state: absent
