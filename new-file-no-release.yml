@@ -1,0 +1,30 @@
+- name: Check if SonarQube project exists
+  id: check_sonar
+  run: |
+    RESPONSE=$(curl -s -u "${SONAR_TOKEN}:" \
+      "${SONAR_HOST_URL}/api/projects/search?projects=${{ inputs.sonar_project_key }}")
+
+    echo "Response: $RESPONSE"
+
+    COUNT=$(echo "$RESPONSE" | jq '.components | length')
+
+    if [ "$COUNT" -gt 0 ]; then
+      echo "exists=true" >> $GITHUB_OUTPUT
+    else
+      echo "exists=false" >> $GITHUB_OUTPUT
+    fi
+  env:
+    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+
+    #####
+
+  - name: SonarQube Scan
+  if: steps.check_sonar.outputs.exists == 'true'
+  uses: axa-actions/SonarSource_sonarqube-scan-action@master
+  with:
+    projectBaseDir: ${{ inputs.projectbasedir_name }}
+  env:
+    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
