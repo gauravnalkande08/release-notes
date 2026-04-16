@@ -1,0 +1,43 @@
+- name: Setup Podman environment (GLOBAL)
+  shell: bash
+  run: |
+    set -euo pipefail
+
+    CURRENT_UID=$(id -u)
+
+    echo "XDG_RUNTIME_DIR=/tmp/run-${CURRENT_UID}" >> $GITHUB_ENV
+    echo "PODMAN_RUNROOT=/tmp/podman-run-${CURRENT_UID}" >> $GITHUB_ENV
+    echo "PODMAN_STORAGE_ROOT=/tmp/podman-storage-${CURRENT_UID}" >> $GITHUB_ENV
+    echo "OCI_RUNTIME=/usr/bin/crun" >> $GITHUB_ENV
+    echo "CONTAINERS_CONF=/tmp/containers.conf" >> $GITHUB_ENV
+
+    mkdir -p /tmp/run-${CURRENT_UID} /tmp/podman-run-${CURRENT_UID} /tmp/podman-storage-${CURRENT_UID}
+    chmod 700 /tmp/run-${CURRENT_UID} /tmp/podman-run-${CURRENT_UID} /tmp/podman-storage-${CURRENT_UID}
+
+    cat <<EOF > /tmp/containers.conf
+[engine]
+runtime = "crun"
+EOF
+
+#######
+
+podman login ...
+podman build ...
+podman images
+podman save ...
+
+#######
+
+echo "${{ secrets.JFROG_PW }}" | podman login \
+  "${BASE_IMAGE_REGISTRY}" \
+  -u "${ARTIFACTORY_USER}" \
+  --password-stdin
+
+#####
+
+- name: Verify login
+  run: |
+    podman info
+    podman pull ${BASE_IMAGE_REGISTRY}/alpine || true
+
+  
