@@ -1,0 +1,82 @@
+1. Your User Story (what you actually need)
+“GHA runners registration at org level using GitHub App authentication”
+👉 In simple terms:
+Register self-hosted runners at org level
+Use GitHub App (machine-to-machine auth)
+Fully automated (no user login)
+✔ This is CI/CD backend automation
+📄 2. What that GitHub doc is saying
+The doc you shared:
+“Generating a user access token for a GitHub App”
+👉 It is about:
+OAuth flow
+User logs in → approves app
+App gets a user access token
+✔ This is for:
+Apps acting on behalf of a user
+UI apps / dashboards / integrations
+⚖️ 3. Key Difference (most important part)
+Aspect
+Your Requirement
+That Document
+Purpose
+Runner automation
+User authentication
+Auth type
+GitHub App (server-to-server)
+OAuth (user-based)
+Needs login?
+❌ No
+✅ Yes
+Token used
+Installation Token
+User Access Token
+Used for runners?
+✅ Yes
+❌ No
+👉 One line:
+You = App acting independently
+Doc = App acting as a user
+🔁 4. What you SHOULD do (correct flow)
+Follow this flow only:
+
+Private Key
+   ↓
+JWT (App auth)
+   ↓
+Installation Token
+   ↓
+Org Runner Registration Token
+   ↓
+Register runner
+🛠️ 5. What you’ve already done (good 👍)
+From your screenshots:
+✔ Created GitHub App
+✔ Generated private key
+✔ Installed app
+👉 You’re on the right track already
+🚀 6. What to do NEXT (exactly)
+Step 1 — Generate JWT
+Use:
+App ID
+Private key
+Step 2 — Get Installation Token
+Bash
+POST /app/installations/{installation_id}/access_tokens
+Step 3 — Get Org Runner Token
+Bash
+POST /orgs/{org}/actions/runners/registration-token
+Authorization: Bearer <installation_token>
+Step 4 — Register runner
+Bash
+./config.sh \
+  --url https://github.axa.com/ORG \
+  --token <runner_token>
+❌ 7. What to IGNORE
+👉 You do NOT need:
+User access token
+OAuth flow
+Callback URL (unless doing login apps)
+🧠 Final takeaway
+Your use case = backend automation → GitHub App installation token
+That doc = frontend/user flow → OAuth user token
